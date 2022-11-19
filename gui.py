@@ -62,7 +62,7 @@ while True:
             img = Image.fromarray(frame)  # create PIL image from frame
             bio = io.BytesIO()  # a binary memory resident stream
             img.save(bio, format='PNG')  # save image as png to it
-            imgbytes = bio.getvalue()  # this can be used by OpenCV hopefully
+            imgbytes = bio.getvalue()
             window['-IMAGE-'].update(data=imgbytes)
             if not ('slider' in window.AllKeysDict):
                 window.extend_layout(window['-COLUMN-'], [[sg.Slider(range=(0, height), default_value=0, size=(30, 20),
