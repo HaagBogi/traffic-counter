@@ -3,6 +3,9 @@ import os
 import numpy as np
 import cv2
 import pandas as pd
+from traffic_counter_ML import detect_cars_on_frame
+from cvlib.object_detection import draw_bbox
+
 
 def call_counter_function(filename: str, count_start_y_pos: int):
     cap = cv2.VideoCapture(filename)
@@ -35,81 +38,48 @@ def call_counter_function(filename: str, count_start_y_pos: int):
         ret, frame = cap.read()  # import image
 
         if ret:  # if there is a frame continue with code
-
-            image = cv2.resize(frame, (0, 0), None, ratio, ratio)  # resize image
-
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)  # converts image to gray
-
-            fgmask = fgbg.apply(gray)  # uses the background subtraction
-
-            # applies different thresholds to fgmask to try and isolate cars
-            # just have to keep playing around with settings until cars are easily identifiable
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))  # kernel to apply to the morphology
-            closing = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel)
-            opening = cv2.morphologyEx(closing, cv2.MORPH_OPEN, kernel)
-            dilation = cv2.dilate(opening, kernel)
-            retvalbin, bins = cv2.threshold(dilation, 220, 255, cv2.THRESH_BINARY)  # removes the shadows
-
-            # creates contours
-            contours, hierarchy = cv2.findContours(bins, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-            # use convex hull to create polygon around contours
-            hull = [cv2.convexHull(c) for c in contours]
+            frame = cv2.resize(frame, (0, 0), None, ratio, ratio)
+            bbox, label, conf = detect_cars_on_frame(frame)
 
             # draw contours
-            cv2.drawContours(image, hull, -1, (0, 255, 0), 3)
+            frame = draw_bbox(frame, bbox, label, conf)
 
             # line created to stop counting contours, needed as cars in distance become one big contour
-            lineypos = (count_start_y_pos - 25) if count_start_y_pos > 25 else (count_start_y_pos + 25)
-            cv2.line(image, (0, lineypos), (width, lineypos), (255, 0, 0), 5)
+            lineypos = (count_start_y_pos - 25) if (count_start_y_pos - 25) > 0 else (count_start_y_pos + 25)
+            cv2.line(frame, (0, lineypos), (width, lineypos), (255, 0, 0), 5)
 
             # line y position created to count contours
             lineypos2 = count_start_y_pos
-            cv2.line(image, (0, lineypos2), (width, lineypos2), (0, 255, 0), 5)
-
-            # min area for contours in case a bunch of small noise contours are created
-            minarea = 300
-
-            # max area for contours, can be quite large for buses
-            maxarea = 50000
+            cv2.line(frame, (0, lineypos2), (width, lineypos2), (0, 255, 0), 5)
 
             # vectors for the x and y locations of contour centroids in current frame
-            cxx = np.zeros(len(contours))
-            cyy = np.zeros(len(contours))
+            cxx = np.zeros(len(bbox))
+            cyy = np.zeros(len(bbox))
 
-            for i in range(len(contours)):  # cycles through all contours in current frame
+            for i in range(len(bbox)):  # cycles through all contours in current frame
 
-                if hierarchy[0, i, 3] == -1:  # using hierarchy to only count parent contours (contours not within others)
+                # calculating centroids of contours
+                box = bbox[i]
+                topleft_x, topleft_y, bottomright_x, bottomright_y = box
 
-                    area = cv2.contourArea(contours[i])  # area of contour
+                cx = int((topleft_x + bottomright_x) / 2)
+                cy = int((topleft_y + bottomright_y) / 2)
 
-                    if minarea < area < maxarea:  # area threshold for contour
+                if cy > lineypos:  # filters out contours that are above line (y starts at top)
 
-                        # calculating centroids of contours
-                        cnt = contours[i]
-                        M = cv2.moments(cnt)
-                        cx = int(M['m10'] / M['m00'])
-                        cy = int(M['m01'] / M['m00'])
 
-                        if cy > lineypos:  # filters out contours that are above line (y starts at top)
+                    cv2.rectangle(frame, (topleft_x, topleft_y), (bottomright_x, bottomright_y), (255, 0, 0), 2)
 
-                            # gets bounding points of contour to create rectangle
-                            # x,y is top left corner and w,h is width and height
-                            x, y, w, h = cv2.boundingRect(cnt)
+                    # Prints centroid text in order to double check later on
+                    cv2.putText(frame, str(cx) + "," + str(cy), (cx + 10, cy + 10), cv2.FONT_HERSHEY_SIMPLEX,
+                                .3, (0, 0, 255), 1)
 
-                            # creates a rectangle around contour
-                            cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                    cv2.drawMarker(frame, (cx, cy), (0, 0, 255), cv2.MARKER_STAR, markerSize=5, thickness=1,
+                                   line_type=cv2.LINE_AA)
 
-                            # Prints centroid text in order to double check later on
-                            cv2.putText(image, str(cx) + "," + str(cy), (cx + 10, cy + 10), cv2.FONT_HERSHEY_SIMPLEX,
-                                        .3, (0, 0, 255), 1)
-
-                            cv2.drawMarker(image, (cx, cy), (0, 0, 255), cv2.MARKER_STAR, markerSize=5, thickness=1,
-                                           line_type=cv2.LINE_AA)
-
-                            # adds centroids that passed previous criteria to centroid list
-                            cxx[i] = cx
-                            cyy[i] = cy
+                    # adds centroids that passed previous criteria to centroid list
+                    cxx[i] = cx
+                    cyy[i] = cy
 
             # eliminates zero entries (centroids that were not added)
             cxx = cxx[cxx != 0]
@@ -185,10 +155,10 @@ def call_counter_function(filename: str, count_start_y_pos: int):
 
                             # if delta values are less than maximum radius then add that centroid to that specific carid
                             if np.abs(mindx) < maxrad and np.abs(mindy) < maxrad:
-
                                 # adds centroid to corresponding previously existing carid
                                 df.at[int(framenumber), str(carids[j])] = [cxx[minx_index], cyy[miny_index]]
-                                minx_index2.append(minx_index)  # appends all the indices that were added to previous carids
+                                minx_index2.append(
+                                    minx_index)  # appends all the indices that were added to previous carids
                                 miny_index2.append(miny_index)
 
                     for i in range(len(cxx)):  # loops through all centroids
@@ -237,13 +207,15 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                 if curcent:  # if there is a current centroid
 
                     # On-screen text for current centroid
-                    cv2.putText(image, "Centroid" + str(curcent[0]) + "," + str(curcent[1]),
+                    cv2.putText(frame, "Centroid" + str(curcent[0]) + "," + str(curcent[1]),
                                 (int(curcent[0]), int(curcent[1])), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 255), 2)
 
-                    cv2.putText(image, "ID:" + str(carids[currentcarsindex[i]]), (int(curcent[0]), int(curcent[1] - 15)),
+                    cv2.putText(frame, "ID:" + str(carids[currentcarsindex[i]]),
+                                (int(curcent[0]), int(curcent[1] - 15)),
                                 cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 255), 2)
 
-                    cv2.drawMarker(image, (int(curcent[0]), int(curcent[1])), (0, 0, 255), cv2.MARKER_STAR, markerSize=5,
+                    cv2.drawMarker(frame, (int(curcent[0]), int(curcent[1])), (0, 0, 255), cv2.MARKER_STAR,
+                                   markerSize=5,
                                    thickness=1, line_type=cv2.LINE_AA)
 
                     if oldcent:  # checks if old centroid exists
@@ -252,7 +224,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                         ystart = oldcent[1] - maxrad
                         xwidth = oldcent[0] + maxrad
                         yheight = oldcent[1] + maxrad
-                        cv2.rectangle(image, (int(xstart), int(ystart)), (int(xwidth), int(yheight)), (0, 125, 0), 1)
+                        cv2.rectangle(frame, (int(xstart), int(ystart)), (int(xwidth), int(yheight)), (0, 125, 0), 1)
 
                         # checks if old centroid is on or below line and curcent is on or above line
                         # to count cars and that car hasn't been counted yet
@@ -260,7 +232,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             currentcarsindex[i]] not in caridscrossed:
 
                             carscrossedup = carscrossedup + 1
-                            cv2.line(image, (0, lineypos2), (width, lineypos2), (0, 0, 255), 5)
+                            cv2.line(frame, (0, lineypos2), (width, lineypos2), (0, 0, 255), 5)
                             caridscrossed.append(
                                 currentcarsindex[i])  # adds car id to list of count cars to prevent double counting
 
@@ -270,54 +242,40 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             currentcarsindex[i]] not in caridscrossed:
 
                             carscrosseddown = carscrosseddown + 1
-                            cv2.line(image, (0, lineypos2), (width, lineypos2), (0, 0, 125), 5)
+                            cv2.line(frame, (0, lineypos2), (width, lineypos2), (0, 0, 125), 5)
                             caridscrossed.append(currentcarsindex[i])
 
             # Top left hand corner on-screen text
-            cv2.rectangle(image, (0, 0), (250, 100), (255, 0, 0), -1)  # background rectangle for on-screen text
+            cv2.rectangle(frame, (0, 0), (250, 100), (255, 0, 0), -1)  # background rectangle for on-screen text
 
-            cv2.putText(image, "Cars in Area: " + str(currentcars), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 170, 0), 1)
-
-            cv2.putText(image, "Cars Crossed Up: " + str(carscrossedup), (0, 30), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 170, 0),
+            cv2.putText(frame, "Cars in Area: " + str(currentcars), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 170, 0),
                         1)
 
-            cv2.putText(image, "Cars Crossed Down: " + str(carscrosseddown), (0, 45), cv2.FONT_HERSHEY_SIMPLEX, .5,
+            cv2.putText(frame, "Cars Crossed Up: " + str(carscrossedup), (0, 30), cv2.FONT_HERSHEY_SIMPLEX, .5,
+                        (0, 170, 0),
+                        1)
+
+            cv2.putText(frame, "Cars Crossed Down: " + str(carscrosseddown), (0, 45), cv2.FONT_HERSHEY_SIMPLEX, .5,
                         (0, 170, 0), 1)
 
-            cv2.putText(image, "Total Cars Detected: " + str(len(carids)), (0, 60), cv2.FONT_HERSHEY_SIMPLEX, .5,
+            cv2.putText(frame, "Total Cars Detected: " + str(len(carids)), (0, 60), cv2.FONT_HERSHEY_SIMPLEX, .5,
                         (0, 170, 0), 1)
 
-            cv2.putText(image, "Frame: " + str(framenumber) + ' of ' + str(frames_count), (0, 75), cv2.FONT_HERSHEY_SIMPLEX,
+            cv2.putText(frame, "Frame: " + str(framenumber) + ' of ' + str(frames_count), (0, 75),
+                        cv2.FONT_HERSHEY_SIMPLEX,
                         .5, (0, 170, 0), 1)
 
-            cv2.putText(image, 'Time: ' + str(round(framenumber / fps, 2)) + ' sec of ' + str(round(frames_count / fps, 2))
+            cv2.putText(frame,
+                        'Time: ' + str(round(framenumber / fps, 2)) + ' sec of ' + str(round(frames_count / fps, 2))
                         + ' sec', (0, 90), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 170, 0), 1)
 
             # displays images and transformations
-            cv2.imshow("countours", image)
-            cv2.moveWindow("countours", 0, 0)
-
-            cv2.imshow("fgmask", fgmask)
-            cv2.moveWindow("fgmask", int(width * ratio), 0)
-
-            cv2.imshow("closing", closing)
-            cv2.moveWindow("closing", width, 0)
-
-            cv2.imshow("opening", opening)
-            cv2.moveWindow("opening", 0, int(height * ratio))
-
-            cv2.imshow("dilation", dilation)
-            cv2.moveWindow("dilation", int(width * ratio), int(height * ratio))
-
-            cv2.imshow("binary", bins)
-            cv2.moveWindow("binary", width, int(height * ratio))
-
-
+            cv2.imshow("countours", frame)
 
             # adds to framecount
             framenumber = framenumber + 1
 
-            k = cv2.waitKey(int(1000/fps)) & 0xff  # int(1000/fps) is normal speed since waitkey is in ms
+            k = cv2.waitKey(int(1000 / fps)) & 0xff  # int(1000/fps) is normal speed since waitkey is in ms
             if k == 27:
                 break
 
@@ -330,5 +288,6 @@ def call_counter_function(filename: str, count_start_y_pos: int):
 
     # saves dataframe to csv file for later analysis
     df.to_csv('traffic.csv', sep=',')
+
 
 call_counter_function(os.path.join("data", "traffic_video.avi"), 250)
