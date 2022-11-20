@@ -3,7 +3,8 @@ import os.path
 import cv2
 from PIL import Image
 import io
-import traffic_counter as counter
+import traffic_counter_line_and_ML as counter
+
 
 file_list_column = [
     [
@@ -57,6 +58,7 @@ while True:
             window["-TOUT-"].update(filename)
             cap = cv2.VideoCapture(filename)
             ret, frame = cap.read()
+            frame = cv2.resize(frame, (0, 0), None, .5, .5)  # resize image
             orig_frame = frame
             height, width = frame.shape[:2]
             img = Image.fromarray(frame)  # create PIL image from frame
@@ -76,7 +78,8 @@ while True:
         y = values["slider"]
         frame = orig_frame.copy()
         height, width = frame.shape[:2]
-        cv2.line(frame, (0, int(height - y)), (int(width), int(height - y)), (255, 0, 0), thickness=1)
+        cv2.line(frame, (0, int(height - y)), (int(width), int(height - y)), (0, 255, 0), thickness=1)
+        cv2.line(frame, (0, int(height - y + 40)), (int(width), int(height - y + 40)), (0, 0, 255), thickness=1)
         img = Image.fromarray(frame)
         bio = io.BytesIO()
         img.save(bio, format='PNG')
@@ -85,6 +88,4 @@ while True:
     elif event == "Count":
         filename = os.path.join(values["-FOLDER-"], values["-FILE LIST-"][0])
         counter.call_counter_function(filename, values["slider"])
-        # a 87. sor helyére kellene a forgalomszámoló
-        # függvényt hívni,a a paraméterek maradjanak ugyan ezek
 window.close()

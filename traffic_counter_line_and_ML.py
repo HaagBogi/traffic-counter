@@ -31,7 +31,6 @@ def call_counter_function(filename: str, count_start_y_pos: int):
     ret, frame = cap.read()  # import image
     ratio = .5  # resize ratio
     image = cv2.resize(frame, (0, 0), None, ratio, ratio)  # resize image
-    width2, height2, channels = image.shape
 
     while True:
 
@@ -43,14 +42,14 @@ def call_counter_function(filename: str, count_start_y_pos: int):
 
             # draw contours
             frame = draw_bbox(frame, bbox, label, conf)
-
             # line created to stop counting contours, needed as cars in distance become one big contour
-            lineypos = (count_start_y_pos - 25) if (count_start_y_pos - 25) > 0 else (count_start_y_pos + 25)
-            cv2.line(frame, (0, lineypos), (width, lineypos), (255, 0, 0), 5)
+            lineypos = (height*.5 - int(count_start_y_pos) + 40)
+            print(lineypos)
+            cv2.line(frame, (0, int(lineypos)), (int(width), int(lineypos)), (255, 0, 0), 5)
 
             # line y position created to count contours
-            lineypos2 = count_start_y_pos
-            cv2.line(frame, (0, lineypos2), (width, lineypos2), (0, 255, 0), 5)
+            lineypos2 = height*.5 - count_start_y_pos
+            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 255, 0), 5)
 
             # vectors for the x and y locations of contour centroids in current frame
             cxx = np.zeros(len(bbox))
@@ -232,7 +231,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             currentcarsindex[i]] not in caridscrossed:
 
                             carscrossedup = carscrossedup + 1
-                            cv2.line(frame, (0, lineypos2), (width, lineypos2), (0, 0, 255), 5)
+                            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 0, 255), 5)
                             caridscrossed.append(
                                 currentcarsindex[i])  # adds car id to list of count cars to prevent double counting
 
@@ -242,7 +241,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             currentcarsindex[i]] not in caridscrossed:
 
                             carscrosseddown = carscrosseddown + 1
-                            cv2.line(frame, (0, lineypos2), (width, lineypos2), (0, 0, 125), 5)
+                            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 0, 125), 5)
                             caridscrossed.append(currentcarsindex[i])
 
             # Top left hand corner on-screen text
@@ -290,4 +289,4 @@ def call_counter_function(filename: str, count_start_y_pos: int):
     df.to_csv('traffic.csv', sep=',')
 
 
-call_counter_function(os.path.join("data", "traffic_video.avi"), 250)
+# call_counter_function(os.path.join("data", "traffic_video.avi"), 250)
