@@ -246,7 +246,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             caridscrossed.append(currentcarsindex[i])
 
             # Top left hand corner on-screen text
-            cv2.rectangle(frame, (0, 0), (250, 100), (255, 0, 0), -1)  # background rectangle for on-screen text
+            cv2.rectangle(frame, (0, 0), (250, 100), (0, 0, 0), -1)  # background rectangle for on-screen text
 
             cv2.putText(frame, "Cars in Area: " + str(currentcars), (0, 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 170, 0),
                         1)
