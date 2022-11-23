@@ -21,6 +21,8 @@ image_viewer_column = [
     [sg.Text(size=(100, 1), key="-TOUT-")],
     [sg.Image(key="-IMAGE-", filename="")],
     [sg.Button("Count")],
+    [sg.Text(size=(100, 1), key="-RESULT-")],
+
 ]
 
 layout = [
@@ -79,7 +81,8 @@ while True:
         frame = orig_frame.copy()
         height, width = frame.shape[:2]
         cv2.line(frame, (0, int(height - y)), (int(width), int(height - y)), (0, 255, 0), thickness=1)
-        cv2.line(frame, (0, int(height - y + 40)), (int(width), int(height - y + 40)), (0, 0, 255), thickness=1)
+        cv2.line(frame, (0, int(height - y - 25)), (int(width), int(height - y - 25)), (0, 0, 255), thickness=1)
+        cv2.line(frame, (0, int(height - y + 25)), (int(width), int(height - y + 25)), (0, 0, 255), thickness=1)
         img = Image.fromarray(frame)
         bio = io.BytesIO()
         img.save(bio, format='PNG')
@@ -87,5 +90,7 @@ while True:
         window['-IMAGE-'].update(data=imgbytes)
     elif event == "Count":
         filename = os.path.join(values["-FOLDER-"], values["-FILE LIST-"][0])
-        counter.call_counter_function(filename, values["slider"])
+        res = counter.call_counter_function(filename, values["slider"])
+        window["-RESULT-"].update("Counted:" + res)
+
 window.close()

@@ -43,13 +43,14 @@ def call_counter_function(filename: str, count_start_y_pos: int):
             # draw contours
             frame = draw_bbox(frame, bbox, label, conf)
             # line created to stop counting contours, needed as cars in distance become one big contour
-            lineypos = (height*.5 - int(count_start_y_pos) + 40)
-            print(lineypos)
-            cv2.line(frame, (0, int(lineypos)), (int(width), int(lineypos)), (255, 0, 0), 5)
+            lineyposstop1 = (height*.5 - int(count_start_y_pos) - 25)
+            lineyposstop2 = (height*.5 - int(count_start_y_pos) + 25)
+            cv2.line(frame, (0, int(lineyposstop1)), (int(width), int(lineyposstop1)), (255, 0, 0), 3)
+            cv2.line(frame, (0, int(lineyposstop2)), (int(width), int(lineyposstop2)), (255, 0, 0), 3)
 
             # line y position created to count contours
             lineypos2 = height*.5 - count_start_y_pos
-            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 255, 0), 5)
+            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 255, 0), 3)
 
             # vectors for the x and y locations of contour centroids in current frame
             cxx = np.zeros(len(bbox))
@@ -64,10 +65,10 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                 cx = int((topleft_x + bottomright_x) / 2)
                 cy = int((topleft_y + bottomright_y) / 2)
 
-                if cy > lineypos:  # filters out contours that are above line (y starts at top)
+                if cy > lineyposstop1 and cy < lineyposstop2:  # filters out contours that are above line (y starts at top)
 
 
-                    cv2.rectangle(frame, (topleft_x, topleft_y), (bottomright_x, bottomright_y), (255, 0, 0), 2)
+                    cv2.rectangle(frame, (topleft_x, topleft_y), (bottomright_x, bottomright_y), (255, 0, 0), 1)
 
                     # Prints centroid text in order to double check later on
                     cv2.putText(frame, str(cx) + "," + str(cy), (cx + 10, cy + 10), cv2.FONT_HERSHEY_SIMPLEX,
@@ -207,11 +208,11 @@ def call_counter_function(filename: str, count_start_y_pos: int):
 
                     # On-screen text for current centroid
                     cv2.putText(frame, "Centroid" + str(curcent[0]) + "," + str(curcent[1]),
-                                (int(curcent[0]), int(curcent[1])), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 255), 2)
+                                (int(curcent[0]), int(curcent[1])), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 255), 1)
 
                     cv2.putText(frame, "ID:" + str(carids[currentcarsindex[i]]),
                                 (int(curcent[0]), int(curcent[1] - 15)),
-                                cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 255), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 255, 255), 1)
 
                     cv2.drawMarker(frame, (int(curcent[0]), int(curcent[1])), (0, 0, 255), cv2.MARKER_STAR,
                                    markerSize=5,
@@ -231,7 +232,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             currentcarsindex[i]] not in caridscrossed:
 
                             carscrossedup = carscrossedup + 1
-                            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 0, 255), 5)
+                            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 0, 255), 3)
                             caridscrossed.append(
                                 currentcarsindex[i])  # adds car id to list of count cars to prevent double counting
 
@@ -241,7 +242,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                             currentcarsindex[i]] not in caridscrossed:
 
                             carscrosseddown = carscrosseddown + 1
-                            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 0, 125), 5)
+                            cv2.line(frame, (0, int(lineypos2)), (int(width), int(lineypos2)), (0, 0, 125), 3)
                             caridscrossed.append(currentcarsindex[i])
 
             # Top left hand corner on-screen text
@@ -284,9 +285,8 @@ def call_counter_function(filename: str, count_start_y_pos: int):
 
     cap.release()
     cv2.destroyAllWindows()
-
+    return str(len(carids))
     # saves dataframe to csv file for later analysis
     df.to_csv('traffic.csv', sep=',')
 
 
-# call_counter_function(os.path.join("data", "traffic_video.avi"), 250)
