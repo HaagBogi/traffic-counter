@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import cv2
 import pandas as pd
@@ -25,12 +23,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
     caridscrossed = []  # blank list to add car ids that have crossed
     totalcars = 0  # keeps track of total cars
 
-    fgbg = cv2.createBackgroundSubtractorMOG2()  # create background subtractor
-
-    # information to start saving a video file
-    ret, frame = cap.read()  # import image
     ratio = .5  # resize ratio
-    image = cv2.resize(frame, (0, 0), None, ratio, ratio)  # resize image
 
     while True:
 
@@ -280,13 +273,9 @@ def call_counter_function(filename: str, count_start_y_pos: int):
                 break
 
         else:  # if video is finished then break loop
-
             break
-
     cap.release()
     cv2.destroyAllWindows()
     return str(len(carids))
-    # saves dataframe to csv file for later analysis
-    df.to_csv('traffic.csv', sep=',')
 
 
