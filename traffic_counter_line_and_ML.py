@@ -78,7 +78,7 @@ def call_counter_function(filename: str, count_start_y_pos: int):
             cxx = cxx[cxx != 0]
             cyy = cyy[cyy != 0]
 
-            # empty list to later check which centroid indices were added to dataframe
+            # empty list to later check which centroid indexes were added to dataframe
             minx_index2 = []
             miny_index2 = []
 
